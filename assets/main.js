@@ -60,6 +60,8 @@
   var scrollTick = false;
   window.addEventListener('scroll', function () { if (!scrollTick) { scrollTick = true; requestAnimationFrame(function () { onScroll(); scrollTick = false; }); } }, { passive: true });
   requestAnimationFrame(onScroll);
+  // Paid-Social-Besucher scrollen kaum (Plausible: 11 % Scrolltiefe): Leiste nach kurzer Zeit auch ohne Scrollen zeigen
+  if (sticky) setTimeout(function () { sticky.classList.add('is-visible'); }, 1200);
 
   // Scroll reveal (IntersectionObserver + geometric fallback, so nothing can stay hidden)
   var revealEls = Array.prototype.slice.call(document.querySelectorAll('.reveal, .reveal-img'));
