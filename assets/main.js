@@ -31,11 +31,13 @@
   var fab = document.querySelector('.fab');
   var prog = document.createElement('div'); prog.className = 'progress'; document.body.appendChild(prog);
   var px = Array.prototype.slice.call(document.querySelectorAll('[data-parallax]'));
-  var parallax = function () {
+  var measure = function () {
+    return px.map(function (el) { return el.parentElement.getBoundingClientRect(); });
+  };
+  var applyParallax = function (rects, vh) {
     if (reduce) return;
-    var vh = window.innerHeight;
-    px.forEach(function (el) {
-      var r = el.parentElement.getBoundingClientRect();
+    px.forEach(function (el, i) {
+      var r = rects[i];
       if (r.bottom < -200 || r.top > vh + 200) return;
       var f = parseFloat(el.getAttribute('data-parallax')) || 0.1;
       var off = Math.max(-90, Math.min(90, (r.top + r.height / 2 - vh / 2) * -f));
@@ -43,15 +45,20 @@
     });
   };
   var onScroll = function () {
+    // Lesephase
     var y = window.scrollY || 0;
-    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var vh = window.innerHeight;
+    var h = document.documentElement.scrollHeight - vh;
+    var rects = px.length ? measure() : [];
+    // Schreibphase
     prog.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
     if (header) header.classList.toggle('is-scrolled', y > 40);
     if (sticky) sticky.classList.toggle('is-visible', y > 140 || sticky.hasAttribute('data-always'));
     if (fab) fab.classList.toggle('is-visible', y > 320);
-    parallax();
+    applyParallax(rects, vh);
   };
-  window.addEventListener('scroll', onScroll, { passive: true });
+  var scrollTick = false;
+  window.addEventListener('scroll', function () { if (!scrollTick) { scrollTick = true; requestAnimationFrame(function () { onScroll(); scrollTick = false; }); } }, { passive: true });
   onScroll();
 
   // Scroll reveal (IntersectionObserver + geometric fallback, so nothing can stay hidden)

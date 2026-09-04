@@ -12,7 +12,7 @@
   --line-strong:#C9CFDA;
   --text:#1F2937;
   --text-2:#5B6577;
-  --text-3:#8A94A6;
+  --text-3:#667080;
   --gold:#B79A5E;
   --white:#fff;
   --max:1180px;
@@ -62,7 +62,7 @@ ul,ol{padding-left:1.2em}
 @media (min-width:640px){.topbar .tb-long{display:inline}}
 
 /* Header */
-.header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.72);-webkit-backdrop-filter:saturate(180%) blur(16px);backdrop-filter:saturate(180%) blur(16px);backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
+.header{position:sticky;top:0;z-index:100;background:#fff;backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
 .header__inner{display:flex;align-items:center;justify-content:space-between;gap:14px;height:66px}
 .brand{display:flex;align-items:center;text-decoration:none}
 .brand img{height:34px;width:auto}
@@ -240,7 +240,7 @@ ul,ol{padding-left:1.2em}
 .footer{background:var(--navy-ink);color:rgba(255,255,255,.72);padding:56px 0 130px;font-size:.88rem;font-weight:300}
 .footer a{color:#fff;text-decoration:none}
 .footer a:hover{text-decoration:underline}
-.footer h4{color:rgba(255,255,255,.55);font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;margin-bottom:16px;font-weight:500}
+.footer h4,.footer h3.footer__h{color:rgba(255,255,255,.55);font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;margin-bottom:16px;font-weight:500}
 .footer ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
 .footer__logo{height:40px;width:auto;margin-bottom:22px}
 .footer__grid{display:grid;gap:34px}
@@ -316,7 +316,7 @@ ul,ol{padding-left:1.2em}
 
 /* ===== Motion, Trust, Emotion ===== */
 .header{transition:box-shadow .3s}
-.header.is-scrolled{background:rgba(255,255,255,.62);box-shadow:0 1px 0 rgba(42,61,96,.08),0 10px 30px rgba(42,61,96,.06)}
+.header.is-scrolled{background:rgba(255,255,255,.66);-webkit-backdrop-filter:saturate(180%) blur(16px);backdrop-filter:saturate(180%) blur(16px);box-shadow:0 1px 0 rgba(42,61,96,.08),0 10px 30px rgba(42,61,96,.06)}
 .header.is-scrolled .header__inner{height:58px}
 .header.is-scrolled .brand img{height:30px}
 .header__inner,.brand img{transition:height .3s ease}
@@ -433,6 +433,7 @@ main>section:not(.hero) .eyebrow::after{content:"";width:22px;height:1px;backgro
 .js .reveal-img img{transform:scale(1.12);transition:transform 1.6s cubic-bezier(.2,.7,.2,1)}
 .js .reveal-img.in img{transform:scale(1)}
 .js .reveal-img .hero__img img{transform:none}
+.marquee__track{will-change:transform}
 
 /* Buttons: Sweep */
 .btn{position:relative;overflow:hidden;isolation:isolate}
