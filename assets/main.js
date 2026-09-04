@@ -59,7 +59,7 @@
   };
   var scrollTick = false;
   window.addEventListener('scroll', function () { if (!scrollTick) { scrollTick = true; requestAnimationFrame(function () { onScroll(); scrollTick = false; }); } }, { passive: true });
-  onScroll();
+  requestAnimationFrame(onScroll);
 
   // Scroll reveal (IntersectionObserver + geometric fallback, so nothing can stay hidden)
   var revealEls = Array.prototype.slice.call(document.querySelectorAll('.reveal, .reveal-img'));
@@ -75,12 +75,15 @@
     }
     var checkVisible = function () {
       var vh = window.innerHeight || document.documentElement.clientHeight;
-      revealEls = revealEls.filter(function (el) {
-        if (el.classList.contains('in')) return false;
-        var r = el.getBoundingClientRect();
-        if (r.top < vh * 0.94 && r.bottom > 0) { revealIn(el); return false; }
-        return true;
+      // Lesephase: alle Positionen messen, dann Schreibphase: Klassen setzen
+      var pending = revealEls.filter(function (el) { return !el.classList.contains('in'); });
+      var rects = pending.map(function (el) { return el.getBoundingClientRect(); });
+      var rest = [];
+      pending.forEach(function (el, i) {
+        var r = rects[i];
+        if (r.top < vh * 0.94 && r.bottom > 0) revealIn(el); else rest.push(el);
       });
+      revealEls = rest;
     };
     var ticking = false;
     var onMove = function () { if (!ticking) { ticking = true; requestAnimationFrame(function () { checkVisible(); ticking = false; }); } };
