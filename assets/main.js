@@ -1,200 +1,137 @@
 (function () {
-  var html = document.documentElement;
-  html.classList.add('js');
+  document.documentElement.classList.add('js');
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Mobile navigation drawer
+  // Menü (Drawer) + Accordion
   var burger = document.querySelector('.burger');
-  var drawer = document.querySelector('.drawer');
+  var drawer = document.getElementById('drawer');
   if (burger && drawer) {
     burger.addEventListener('click', function () {
       var open = burger.getAttribute('aria-expanded') === 'true';
       burger.setAttribute('aria-expanded', String(!open));
+      burger.setAttribute('aria-label', open ? 'Menü öffnen' : 'Menü schließen');
       drawer.setAttribute('data-open', String(!open));
       document.body.style.overflow = open ? '' : 'hidden';
     });
+    drawer.querySelectorAll('.drawer__list > li > button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var li = b.parentElement; var open = li.getAttribute('data-open') === 'true';
+        li.setAttribute('data-open', String(!open)); b.setAttribute('aria-expanded', String(!open));
+      });
+    });
   }
 
-  // Split headlines into words (masked reveal)
-  var esc = function (t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
-  document.querySelectorAll('.split').forEach(function (el) {
-    if (el.getAttribute('data-split')) return;
-    el.setAttribute('data-split', '1');
-    var words = el.textContent.trim().split(/\s+/);
-    el.innerHTML = words.map(function (w, i) { return '<span class="w"><span style="transition-delay:' + (i * 0.07).toFixed(2) + 's">' + esc(w) + '</span></span>'; }).join(' ');
-  });
-  setTimeout(function () { document.querySelectorAll('h1.split').forEach(function (h) { h.classList.add('in'); }); }, 120);
-
-  // Progress line, header compact, sticky bar, floating button, parallax
+  // Header-Zustand
   var header = document.querySelector('.header');
-  var sticky = document.querySelector('.sticky-cta');
-  var fab = document.querySelector('.fab');
-  var prog = document.createElement('div'); prog.className = 'progress'; document.body.appendChild(prog);
-  var px = Array.prototype.slice.call(document.querySelectorAll('[data-parallax]'));
-  var measure = function () {
-    return px.map(function (el) { return el.parentElement.getBoundingClientRect(); });
-  };
-  var applyParallax = function (rects, vh) {
-    if (reduce) return;
-    px.forEach(function (el, i) {
-      var r = rects[i];
-      if (r.bottom < -200 || r.top > vh + 200) return;
-      var f = parseFloat(el.getAttribute('data-parallax')) || 0.1;
-      var off = Math.max(-90, Math.min(90, (r.top + r.height / 2 - vh / 2) * -f));
-      el.style.transform = 'translateY(' + off.toFixed(1) + 'px)' + (el.classList.contains('hero__img') ? ' scale(1.08)' : '');
-    });
-  };
-  var onScroll = function () {
-    // Lesephase
-    var y = window.scrollY || 0;
-    var vh = window.innerHeight;
-    var h = document.documentElement.scrollHeight - vh;
-    var rects = px.length ? measure() : [];
-    // Schreibphase
-    prog.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
-    if (header) header.classList.toggle('is-scrolled', y > 40);
-    if (sticky) sticky.classList.toggle('is-visible', y > 140 || sticky.hasAttribute('data-always'));
-    if (fab) fab.classList.toggle('is-visible', y > 320);
-    applyParallax(rects, vh);
-  };
-  var scrollTick = false;
-  window.addEventListener('scroll', function () { if (!scrollTick) { scrollTick = true; requestAnimationFrame(function () { onScroll(); scrollTick = false; }); } }, { passive: true });
+  var tick = false;
+  var onScroll = function () { if (header) header.classList.toggle('is-scrolled', (window.scrollY || 0) > 24); };
+  window.addEventListener('scroll', function () { if (!tick) { tick = true; requestAnimationFrame(function () { onScroll(); tick = false; }); } }, { passive: true });
   requestAnimationFrame(onScroll);
-  // Paid-Social-Besucher scrollen kaum (Plausible: 11 % Scrolltiefe): Leiste nach kurzer Zeit auch ohne Scrollen zeigen
-  if (sticky) setTimeout(function () { sticky.classList.add('is-visible'); }, 1200);
 
-  // Scroll reveal (IntersectionObserver + geometric fallback, so nothing can stay hidden)
-  var revealEls = Array.prototype.slice.call(document.querySelectorAll('.reveal, .reveal-img'));
-  var revealIn = function (el) { el.classList.add('in'); };
-  if (!revealEls.length || reduce) {
-    revealEls.forEach(revealIn);
-  } else {
+  // Sanftes Einblenden beim Scrollen (mit Fallback, damit nichts verborgen bleibt)
+  var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  var show = function (el) { el.classList.add('in'); };
+  if (!els.length || reduce) { els.forEach(show); }
+  else {
     if ('IntersectionObserver' in window) {
       var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) { if (en.isIntersecting) { revealIn(en.target); io.unobserve(en.target); } });
-      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
-      revealEls.forEach(function (el) { io.observe(el); });
+        entries.forEach(function (en) { if (en.isIntersecting) { show(en.target); io.unobserve(en.target); } });
+      }, { rootMargin: '0px 0px -6% 0px', threshold: 0.05 });
+      els.forEach(function (el) { io.observe(el); });
     }
-    var checkVisible = function () {
+    var check = function () {
       var vh = window.innerHeight || document.documentElement.clientHeight;
-      // Lesephase: alle Positionen messen, dann Schreibphase: Klassen setzen
-      var pending = revealEls.filter(function (el) { return !el.classList.contains('in'); });
+      var pending = els.filter(function (el) { return !el.classList.contains('in'); });
       var rects = pending.map(function (el) { return el.getBoundingClientRect(); });
       var rest = [];
-      pending.forEach(function (el, i) {
-        var r = rects[i];
-        if (r.top < vh * 0.94 && r.bottom > 0) revealIn(el); else rest.push(el);
-      });
-      revealEls = rest;
+      pending.forEach(function (el, i) { if (rects[i].top < vh * 0.95 && rects[i].bottom > 0) show(el); else rest.push(el); });
+      els = rest;
     };
-    var ticking = false;
-    var onMove = function () { if (!ticking) { ticking = true; requestAnimationFrame(function () { checkVisible(); ticking = false; }); } };
+    var t2 = false;
+    var onMove = function () { if (!t2) { t2 = true; requestAnimationFrame(function () { check(); t2 = false; }); } };
     window.addEventListener('scroll', onMove, { passive: true });
     window.addEventListener('resize', onMove);
-    setTimeout(checkVisible, 300);
-    setTimeout(checkVisible, 1200);
-    window.addEventListener('load', checkVisible);
+    setTimeout(check, 250); setTimeout(check, 1200); window.addEventListener('load', check);
   }
 
-  // Count-up numbers
-  var counters = document.querySelectorAll('[data-count]');
-  var fmt = function (n, dec) {
-    return dec ? n.toFixed(dec).replace('.', ',') : Math.round(n).toLocaleString('de-DE');
+  // Ereignisse (Plausible-Ziele: Termin, Preisliste, WhatsApp, Anruf)
+  var track = function (name, props) { if (window.plausible) window.plausible(name, props ? { props: props } : undefined); };
+  document.querySelectorAll('a[href^="https://wa.me"]').forEach(function (a) { a.addEventListener('click', function () { track('WhatsApp', { page: location.pathname }); }); });
+  document.querySelectorAll('a[href^="tel:"]').forEach(function (a) { a.addEventListener('click', function () { track('Anruf', { page: location.pathname }); }); });
+
+  // Formulare: senden an FORM_ENDPOINT (action) wenn gesetzt, sonst lokal bestätigen
+  var send = function (form) {
+    var action = form.getAttribute('action');
+    if (!action) return Promise.resolve(true);
+    var fd = new FormData(form);
+    fd.append('seite', location.pathname);
+    return fetch(action, { method: 'POST', body: fd, headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok; }).catch(function () { return false; });
   };
-  var runCount = function (el) {
-    var target = parseFloat(el.getAttribute('data-count'));
-    var dec = parseInt(el.getAttribute('data-decimals') || '0', 10);
-    var suffix = el.getAttribute('data-suffix') || '';
-    if (reduce) { el.textContent = fmt(target, dec) + suffix; return; }
-    var start = null, dur = 1400;
-    var step = function (ts) {
-      if (!start) start = ts;
-      var p = Math.min(1, (ts - start) / dur);
-      var eased = 1 - Math.pow(1 - p, 3);
-      el.textContent = fmt(target * eased, dec) + suffix;
-      if (p < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  };
-  var pending = Array.prototype.slice.call(counters);
-  var startCounter = function (el) { if (el.getAttribute('data-started')) return; el.setAttribute('data-started', '1'); runCount(el); };
-  if (pending.length && 'IntersectionObserver' in window) {
-    var cio = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) { if (en.isIntersecting) { startCounter(en.target); cio.unobserve(en.target); } });
-    }, { threshold: 0.3 });
-    pending.forEach(function (el) { cio.observe(el); });
-  }
-  var checkCounters = function () {
-    var vh = window.innerHeight || document.documentElement.clientHeight;
-    pending = pending.filter(function (el) {
-      var r = el.getBoundingClientRect();
-      if (r.top < vh && r.bottom > 0) { startCounter(el); return false; }
-      return true;
+  var valid = function (form) {
+    var ok = true;
+    form.querySelectorAll('[required]').forEach(function (f) {
+      var bad = f.type === 'checkbox' ? !f.checked : !f.value.trim() || (f.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.value));
+      f.style.outline = bad ? '2px solid #B0413E' : ''; if (bad) ok = false;
     });
+    return ok;
   };
-  window.addEventListener('scroll', checkCounters, { passive: true });
-  setTimeout(checkCounters, 400);
-  setTimeout(checkCounters, 1500);
 
-  // Marquee: duplicate track for seamless loop
-  document.querySelectorAll('.marquee__track').forEach(function (track) {
-    track.innerHTML += track.innerHTML;
-  });
-
-  // Review strip arrows
-  document.querySelectorAll('[data-strip]').forEach(function (wrap) {
-    var strip = wrap.querySelector('.strip');
-    wrap.querySelectorAll('[data-strip-prev],[data-strip-next]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var card = strip.querySelector('.strip > *');
-        var w = card ? card.getBoundingClientRect().width + 24 : 320;
-        strip.scrollBy({ left: btn.hasAttribute('data-strip-next') ? w : -w, behavior: reduce ? 'auto' : 'smooth' });
+  // Preislisten-Funnel: E-Mail -> Liste sofort anzeigen -> WhatsApp-Hinweis
+  var pl = document.querySelector('form[data-pricelist]');
+  if (pl) {
+    var opt = pl.querySelector('[data-wa-opt]'); var waField = pl.querySelector('[data-wa-field]');
+    if (opt && waField) opt.addEventListener('change', function () { waField.hidden = !opt.checked; });
+    pl.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (pl.querySelector('[name="website"]').value) return; // Honeypot
+      if (!valid(pl)) return;
+      var btn = pl.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'Einen Moment…';
+      send(pl).then(function () {
+        pl.setAttribute('data-done', 'true');
+        document.querySelector('[data-pricelist-success]').setAttribute('data-show', 'true');
+        var list = document.querySelector('[data-pricelist-content]');
+        if (list) { list.hidden = false; list.querySelectorAll('.reveal').forEach(show); setTimeout(function () { list.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }, 80); }
+        try { localStorage.setItem('mp_pricelist', '1'); } catch (err) {}
+        track('Preisliste', { whatsapp: opt && opt.checked ? 'ja' : 'nein' });
       });
     });
-  });
+    try { if (localStorage.getItem('mp_pricelist') === '1') { var list0 = document.querySelector('[data-pricelist-content]'); if (list0) { list0.hidden = false; list0.querySelectorAll('.reveal').forEach(show); } } } catch (err) {}
+  }
 
-  // Contact form: compose a WhatsApp message (works without backend).
-  var form = document.querySelector('form[data-wa-form]');
-  if (form) {
-    form.addEventListener('submit', function (e) {
+  // Terminformular
+  var tf = document.querySelector('form[data-termin]');
+  if (tf) {
+    tf.addEventListener('submit', function (e) {
       e.preventDefault();
-      var f = new FormData(form);
-      var lines = [
-        'Hallo Frau Peters,',
-        '',
-        (f.get('anliegen') ? 'Anliegen: ' + f.get('anliegen') : ''),
-        (f.get('bereich') ? 'Bereich: ' + f.get('bereich') : ''),
-        (f.get('nachricht') ? 'Nachricht: ' + f.get('nachricht') : ''),
-        '',
-        'Name: ' + (f.get('name') || ''),
-        (f.get('telefon') ? 'Telefon: ' + f.get('telefon') : '')
-      ].filter(function (l, i, a) { return !(l === '' && a[i - 1] === ''); });
-      var url = 'https://wa.me/' + form.getAttribute('data-wa-form') + '?text=' + encodeURIComponent(lines.join('\n'));
-      window.open(url, '_blank', 'noopener');
+      if (tf.querySelector('[name="website"]').value) return;
+      if (!valid(tf)) return;
+      var btn = tf.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'Wird gesendet…';
+      send(tf).then(function (ok) {
+        if (!tf.getAttribute('action')) {
+          // Kein Endpunkt konfiguriert: Anfrage als WhatsApp-Nachricht vorbereiten
+          var f = new FormData(tf);
+          var msg = ['Terminanfrage', 'Name: ' + f.get('name'), 'Kontakt: ' + f.get('kontakt'), 'Anliegen: ' + f.get('anliegen'), f.get('wunschzeit') ? 'Wunschzeit: ' + f.get('wunschzeit') : '', f.get('nachricht') ? 'Nachricht: ' + f.get('nachricht') : ''].filter(Boolean).join('\n');
+          var wa = document.querySelector('.sticky a[href^="https://wa.me"]');
+          var num = wa ? wa.getAttribute('href').match(/wa\.me\/(\d+)/)[1] : '';
+          window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+        }
+        tf.setAttribute('data-done', 'true');
+        document.querySelector('[data-termin-success]').setAttribute('data-show', 'true');
+        track('Termin', { anliegen: String(new FormData(tf).get('anliegen') || '') });
+      });
     });
   }
 
-  // Trustindex widget: only on click
+  // Trustindex nur auf Klick laden
   var mount = document.querySelector('.ti-mount[data-ti]');
-  if (mount) {
-    var load = function () {
+  var tiBtn = document.querySelector('[data-ti-load]');
+  if (mount && tiBtn) {
+    tiBtn.addEventListener('click', function () {
       if (mount.getAttribute('data-loaded')) return;
       mount.setAttribute('data-loaded', '1');
-      var s = document.createElement('script');
-      s.src = 'https://cdn.trustindex.io/loader.js?' + mount.getAttribute('data-ti');
-      s.defer = true;
-      mount.appendChild(s);
-    };
-    var btn = document.querySelector('[data-ti-load]');
-    if (btn) btn.addEventListener('click', function () { load(); btn.hidden = true; });
-  }
-
-  // Conversion events (Plausible / GA4 compatible, no-op if absent)
-  document.querySelectorAll('a[href^="https://wa.me"], a[href^="tel:"]').forEach(function (a) {
-    a.addEventListener('click', function () {
-      var ev = a.href.indexOf('wa.me') > -1 ? 'WhatsApp' : 'Anruf';
-      if (window.plausible) window.plausible(ev);
-      if (window.gtag) window.gtag('event', ev.toLowerCase(), { event_category: 'conversion' });
+      var s = document.createElement('script'); s.src = 'https://cdn.trustindex.io/loader.js?' + mount.getAttribute('data-ti'); s.defer = true; mount.appendChild(s);
+      tiBtn.hidden = true;
     });
-  });
+  }
 })();
