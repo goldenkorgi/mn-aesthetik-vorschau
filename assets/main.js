@@ -145,7 +145,8 @@
           ? 'https://maps.google.com/maps?q=&layer=c&cbll=' + lat + ',' + lng + '&cbp=11,0,0,0,0&output=svembed'
           : 'https://maps.google.com/maps?q=' + q + '&z=17&output=embed';
         frame.innerHTML = '<iframe src="' + src + '" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade" title="Google Maps"></iframe>';
-        frame.hidden = false;
+        frame.hidden = false; frame.classList.remove('mapload__frame--placeholder');
+        var cover = box.querySelector('.mapload__cover'); if (cover) cover.hidden = true;
         if (window.plausible) window.plausible('Karte');
       });
     });
