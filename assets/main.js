@@ -29,7 +29,7 @@
   requestAnimationFrame(onScroll);
 
   // Sanftes Einblenden beim Scrollen (mit Fallback, damit nichts verborgen bleibt)
-  var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  var els = Array.prototype.slice.call(document.querySelectorAll('.reveal, .reveal-img'));
   var show = function (el) { el.classList.add('in'); };
   if (!els.length || reduce) { els.forEach(show); }
   else {
@@ -133,5 +133,69 @@
       var s = document.createElement('script'); s.src = 'https://cdn.trustindex.io/loader.js?' + mount.getAttribute('data-ti'); s.defer = true; mount.appendChild(s);
       tiBtn.hidden = true;
     });
+  }
+
+  // Karte / Street View nur auf Klick (Datenschutz)
+  document.querySelectorAll('.mapload').forEach(function (box) {
+    var frame = box.querySelector('.mapload__frame');
+    box.querySelectorAll('[data-map]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var lat = box.getAttribute('data-lat'), lng = box.getAttribute('data-lng'), q = encodeURIComponent(box.getAttribute('data-q'));
+        var src = btn.getAttribute('data-map') === 'sv'
+          ? 'https://maps.google.com/maps?q=&layer=c&cbll=' + lat + ',' + lng + '&cbp=11,0,0,0,0&output=svembed'
+          : 'https://maps.google.com/maps?q=' + q + '&z=17&output=embed';
+        frame.innerHTML = '<iframe src="' + src + '" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade" title="Google Maps"></iframe>';
+        frame.hidden = false;
+        if (window.plausible) window.plausible('Karte');
+      });
+    });
+  });
+
+  // 360°-Rundgang erst auf Klick laden
+  document.querySelectorAll('[data-tour]').forEach(function (card) {
+    var btn = card.querySelector('[data-tour-open]');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var media = card.querySelector('.tour__media');
+      media.innerHTML = '<iframe src="' + card.getAttribute('data-tour') + '" title="360°-Rundgang durch die Praxis" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>';
+      media.classList.add('is-live');
+      btn.hidden = true;
+      if (window.plausible) window.plausible('Rundgang');
+    });
+  });
+
+  // ProvenExpert-Siegel: verzögert laden, damit LCP und Mobile unberührt bleiben
+  if (window.MP_PE && !document.documentElement.hasAttribute('data-preview-noindex')) {
+    var loadSeal = function () {
+      if (window.__peLoaded) return; window.__peLoaded = true;
+      var mobile = window.innerWidth < 1000;
+      window.loadProSeal = function () {
+        if (!window.provenExpert) return;
+        window.provenExpert.proSeal({
+          widgetId: window.MP_PE.id, language: 'de-DE', usePageLanguage: false,
+          bannerColor: window.MP_PE.color, textColor: '#FFFFFF', showReviews: true, hideDate: true, hideName: false,
+          hideOnMobile: false, bottom: mobile ? '86px' : '30px', stickyToSide: 'right', googleStars: true, zIndex: '95', displayReviewerLastName: false
+        });
+      };
+      var sc = document.createElement('script'); sc.src = 'https://s.provenexpert.net/seals/proseal-v2.js'; sc.async = true; sc.onload = window.loadProSeal;
+      document.body.appendChild(sc);
+    };
+    var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 1); };
+    window.addEventListener('load', function () { setTimeout(function () { idle(loadSeal); }, 2500); });
+  }
+
+  // Micro-Videos: erst nahe dem Viewport laden, außerhalb pausieren, bei reduzierter Bewegung nur Poster
+  var vids = Array.prototype.slice.call(document.querySelectorAll('video[data-src]'));
+  if (vids.length && !reduce && 'IntersectionObserver' in window) {
+    var vio = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        var v = en.target;
+        if (en.isIntersecting) {
+          if (!v.getAttribute('src')) { v.setAttribute('src', v.getAttribute('data-src')); v.load(); }
+          var p = v.play(); if (p && p.catch) p.catch(function () {});
+        } else if (v.getAttribute('src')) { v.pause(); }
+      });
+    }, { rootMargin: '200px 0px' });
+    vids.forEach(function (v) { vio.observe(v); });
   }
 })();
