@@ -1,2 +1,3 @@
+# Vorschauversion. Indexierung ist per noindex-Meta auf jeder Seite unterbunden.
 User-agent: *
-Disallow: /
+Allow: /
