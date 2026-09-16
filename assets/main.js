@@ -111,6 +111,17 @@
       if (!valid(tf)) return;
       var btn = tf.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'Wird gesendet…';
       send(tf).then(function (ok) {
+        var old = tf.querySelector('.form-error'); if (old) old.remove();
+        if (tf.getAttribute('action') && !ok) {
+          // Senden fehlgeschlagen: nicht „unterwegs“ melden, sondern andere Wege anbieten
+          btn.disabled = false; btn.textContent = 'Erneut senden';
+          var err = document.createElement('p'); err.className = 'form-error'; err.setAttribute('role', 'alert');
+          var tel = document.querySelector('a[href^="tel:"]'); var wa0 = document.querySelector('a[href^="https://wa.me"]');
+          err.innerHTML = 'Das hat leider nicht geklappt. Bitte versuchen Sie es erneut oder melden Sie sich direkt' + (tel ? ' unter <a href="' + tel.getAttribute('href') + '">' + tel.textContent.trim() + '</a>' : '') + (wa0 ? ' oder per <a href="' + wa0.getAttribute('href') + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '.';
+          btn.insertAdjacentElement('afterend', err);
+          track('Termin Fehler', { page: location.pathname });
+          return;
+        }
         if (!tf.getAttribute('action')) {
           // Kein Endpunkt konfiguriert: Anfrage als WhatsApp-Nachricht vorbereiten
           var f = new FormData(tf);
@@ -118,6 +129,13 @@
           var wa = document.querySelector('a[href^="https://wa.me"]');
           var num = wa ? wa.getAttribute('href').match(/wa\.me\/(\d+)/)[1] : '';
           window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+          // Ohne Endpunkt kommt nur an, was in WhatsApp abgeschickt wird: das auch so sagen
+          var sx = document.querySelector('[data-termin-success]');
+          if (sx) {
+            var h = sx.querySelector('h2,h3'); var t = sx.querySelector('p');
+            if (h) h.textContent = 'Fast geschafft: Bitte senden Sie die Nachricht in WhatsApp ab.';
+            if (t) t.textContent = 'Ihre Anfrage ist in WhatsApp vorbereitet. Erst nach dem Absenden kommt sie bei uns an. Hat sich WhatsApp nicht geöffnet, rufen Sie uns gerne an.';
+          }
         }
         tf.setAttribute('data-done', 'true');
         document.querySelector('[data-termin-success]').setAttribute('data-show', 'true');
