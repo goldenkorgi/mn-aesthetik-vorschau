@@ -6,13 +6,18 @@
   var burger = document.querySelector('.burger');
   var drawer = document.getElementById('drawer');
   if (burger && drawer) {
-    burger.addEventListener('click', function () {
-      var open = burger.getAttribute('aria-expanded') === 'true';
-      burger.setAttribute('aria-expanded', String(!open));
-      burger.setAttribute('aria-label', open ? 'Menü öffnen' : 'Menü schließen');
-      drawer.setAttribute('data-open', String(!open));
-      document.body.style.overflow = open ? '' : 'hidden';
+    var setDrawer = function (open) {
+      burger.setAttribute('aria-expanded', String(open));
+      burger.setAttribute('aria-label', open ? 'Menü schließen' : 'Menü öffnen');
+      drawer.setAttribute('data-open', String(open));
+      document.body.style.overflow = open ? 'hidden' : '';
+    };
+    burger.addEventListener('click', function () { setDrawer(burger.getAttribute('aria-expanded') !== 'true'); });
+    // Escape schließt das Menü und gibt den Fokus an den Menüknopf zurück (Masterbriefing 17.5)
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && drawer.getAttribute('data-open') === 'true') { setDrawer(false); burger.focus(); }
     });
+    drawer.querySelectorAll('a[href*="#"]').forEach(function (a) { a.addEventListener('click', function () { setDrawer(false); }); });
     drawer.querySelectorAll('.drawer__list > li > button').forEach(function (b) {
       b.addEventListener('click', function () {
         var li = b.parentElement; var open = li.getAttribute('data-open') === 'true';
@@ -124,7 +129,8 @@
       var btn = pl.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'Einen Moment…';
       send(pl).then(function () {
         pl.setAttribute('data-done', 'true');
-        document.querySelector('[data-pricelist-success]').setAttribute('data-show', 'true');
+        var okBox = document.querySelector('[data-pricelist-success]'); okBox.setAttribute('data-show', 'true');
+        try { okBox.focus({ preventScroll: true }); } catch (err) {}
         var list = document.querySelector('[data-pricelist-content]');
         if (list) { list.hidden = false; list.querySelectorAll('.reveal').forEach(show); setTimeout(function () { list.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }, 80); }
         try { localStorage.setItem('mp_pricelist', '1'); } catch (err) {}
@@ -170,7 +176,8 @@
           }
         }
         tf.setAttribute('data-done', 'true');
-        document.querySelector('[data-termin-success]').setAttribute('data-show', 'true');
+        var tBox = document.querySelector('[data-termin-success]'); tBox.setAttribute('data-show', 'true');
+        try { tBox.focus({ preventScroll: true }); tBox.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' }); } catch (err) {}
         track('Termin', { anliegen: String(new FormData(tf).get('anliegen') || '') });
       });
     });
@@ -230,7 +237,7 @@
         window.provenExpert.proSeal({
           widgetId: window.MP_PE.id, language: 'de-DE', usePageLanguage: false,
           bannerColor: window.MP_PE.color, textColor: '#FFFFFF', showReviews: true, hideDate: true, hideName: false,
-          hideOnMobile: !window.MP_PE.mobile, bottom: mobile ? '86px' : '30px', stickyToSide: 'right', googleStars: true, zIndex: '95', displayReviewerLastName: false
+          hideOnMobile: !window.MP_PE.mobile, bottom: mobile ? '86px' : '30px', stickyToSide: 'right', googleStars: false, zIndex: '95', displayReviewerLastName: false
         });
       };
       var sc = document.createElement('script'); sc.src = 'https://s.provenexpert.net/seals/proseal-v2.js'; sc.async = true; sc.onload = window.loadProSeal;
@@ -241,19 +248,34 @@
   }
 
   // Micro-Videos: erst nahe dem Viewport laden, außerhalb pausieren, bei reduzierter Bewegung nur Poster
+  // Poster erst nahe dem Viewport (nicht mit dem Hero konkurrieren), Pause-Knopf für Nutzer (WCAG 2.2.2)
   var vids = Array.prototype.slice.call(document.querySelectorAll('video[data-src]'));
-  if (vids.length && !reduce && 'IntersectionObserver' in window) {
+  var setPoster = function (v) { if (v.getAttribute('data-poster') && !v.getAttribute('poster')) v.setAttribute('poster', v.getAttribute('data-poster')); };
+  if (vids.length && 'IntersectionObserver' in window) {
+    vids.forEach(function (v) {
+      if (reduce) return;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'video-toggle';
+      b.setAttribute('aria-pressed', 'false'); b.textContent = 'Video anhalten';
+      b.addEventListener('click', function () {
+        var paused = b.getAttribute('aria-pressed') === 'true';
+        if (paused) { v.removeAttribute('data-user-paused'); var pp = v.play(); if (pp && pp.catch) pp.catch(function () {}); }
+        else { v.setAttribute('data-user-paused', ''); v.pause(); }
+        b.setAttribute('aria-pressed', String(!paused)); b.textContent = paused ? 'Video anhalten' : 'Video abspielen';
+      });
+      v.parentNode.appendChild(b);
+    });
     var vio = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
         var v = en.target;
-        if (en.isIntersecting) {
-          if (!v.getAttribute('src')) { v.setAttribute('src', v.getAttribute('data-src')); v.load(); }
-          var p = v.play(); if (p && p.catch) p.catch(function () {});
-        } else if (v.getAttribute('src')) { v.pause(); }
+        if (!en.isIntersecting) { if (v.getAttribute('src')) v.pause(); return; }
+        setPoster(v);
+        if (reduce) return;
+        if (!v.getAttribute('src')) { v.setAttribute('src', v.getAttribute('data-src')); v.load(); }
+        if (!v.hasAttribute('data-user-paused')) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
       });
-    }, { rootMargin: '200px 0px' });
+    }, { rootMargin: '300px 0px' });
     vids.forEach(function (v) { vio.observe(v); });
-  }
+  } else { vids.forEach(setPoster); }
 
   // Lange Bewertungen auf sechs Zeilen kürzen, mit „Weiterlesen“ (Masterbriefing 2.4). Text bleibt vollständig im HTML.
   var clampReview = function (p) {
