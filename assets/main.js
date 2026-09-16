@@ -71,13 +71,45 @@
     return fetch(action, { method: 'POST', body: fd, headers: { Accept: 'application/json' } })
       .then(function (r) { return r.ok; }).catch(function () { return false; });
   };
+  // Pflichtfelder: Fehler als Text am Feld, per aria-describedby verknüpft, Fokus auf das erste Feld (Masterbriefing 17.5)
+  var isBad = function (f) {
+    return f.type === 'checkbox' ? !f.checked : !f.value.trim() || (f.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.value.trim()));
+  };
+  var fieldMsg = function (f) {
+    if (f.type === 'checkbox') return 'Bitte bestätigen Sie, dass Sie die Datenschutzerklärung gelesen haben.';
+    if (f.type === 'email') return f.value.trim() ? 'Bitte prüfen Sie die E-Mail-Adresse, zum Beispiel name@beispiel.de.' : 'Bitte geben Sie Ihre E-Mail-Adresse an.';
+    var lab = f.id ? document.querySelector('label[for="' + f.id + '"]') : null;
+    var name = lab ? lab.textContent.replace(/\s*\*\s*$/, '').trim() : 'dieses Feld';
+    return 'Bitte füllen Sie das Feld „' + name + '“ aus.';
+  };
+  var markField = function (form, f, bad) {
+    var id = (f.id || (form.getAttribute('data-termin') !== null ? 't-' : 'pl-') + f.name) + '-fehler';
+    var msg = document.getElementById(id);
+    if (bad) {
+      if (!msg) {
+        msg = document.createElement('p'); msg.className = 'field-error'; msg.id = id;
+        (f.type === 'checkbox' ? f.closest('label') : f).insertAdjacentElement('afterend', msg);
+      }
+      msg.textContent = fieldMsg(f);
+      f.setAttribute('aria-invalid', 'true'); f.setAttribute('aria-describedby', id);
+    } else {
+      if (msg) msg.remove();
+      f.removeAttribute('aria-invalid'); f.removeAttribute('aria-describedby');
+    }
+  };
   var valid = function (form) {
-    var ok = true;
+    var first = null;
     form.querySelectorAll('[required]').forEach(function (f) {
-      var bad = f.type === 'checkbox' ? !f.checked : !f.value.trim() || (f.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.value));
-      f.style.outline = bad ? '2px solid #B0413E' : ''; if (bad) ok = false;
+      var bad = isBad(f); markField(form, f, bad);
+      if (bad && !first) first = f;
     });
-    return ok;
+    if (!form.hasAttribute('data-live-check')) {
+      form.setAttribute('data-live-check', '');
+      var recheck = function (e) { var f = e.target; if (f.getAttribute && f.getAttribute('aria-invalid') === 'true') markField(form, f, isBad(f)); };
+      form.addEventListener('input', recheck); form.addEventListener('change', recheck);
+    }
+    if (first) first.focus();
+    return !first;
   };
 
   // Preislisten-Funnel: E-Mail -> Liste sofort anzeigen -> WhatsApp-Hinweis
