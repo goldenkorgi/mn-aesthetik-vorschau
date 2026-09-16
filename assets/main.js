@@ -255,12 +255,12 @@
     vids.forEach(function (v) {
       if (reduce) return;
       var b = document.createElement('button'); b.type = 'button'; b.className = 'video-toggle';
-      b.setAttribute('aria-pressed', 'false'); b.textContent = 'Video anhalten';
+      b.textContent = 'Video anhalten';
       b.addEventListener('click', function () {
-        var paused = b.getAttribute('aria-pressed') === 'true';
+        var paused = v.hasAttribute('data-user-paused');
         if (paused) { v.removeAttribute('data-user-paused'); var pp = v.play(); if (pp && pp.catch) pp.catch(function () {}); }
         else { v.setAttribute('data-user-paused', ''); v.pause(); }
-        b.setAttribute('aria-pressed', String(!paused)); b.textContent = paused ? 'Video anhalten' : 'Video abspielen';
+        b.textContent = paused ? 'Video anhalten' : 'Video abspielen';
       });
       v.parentNode.appendChild(b);
     });
