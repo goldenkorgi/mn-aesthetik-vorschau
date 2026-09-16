@@ -57,6 +57,9 @@
   // Ereignisse (Plausible-Ziele: Termin, Preisliste, WhatsApp, Anruf)
   var track = function (name, props) { if (window.plausible) window.plausible(name, props ? { props: props } : undefined); };
   document.querySelectorAll('a[href^="https://wa.me"]').forEach(function (a) { a.addEventListener('click', function () { track('WhatsApp', { page: location.pathname }); }); });
+  document.querySelectorAll('.sticky a[href$="/termin-vereinbaren/"], .sticky a[href$="/preisliste/"]').forEach(function (a) {
+    a.addEventListener('click', function () { track('Sticky', { ziel: /preisliste\/$/.test(a.getAttribute('href')) ? 'Preisliste' : 'Termin', page: location.pathname }); });
+  });
   document.querySelectorAll('a[href^="tel:"]').forEach(function (a) { a.addEventListener('click', function () { track('Anruf', { page: location.pathname }); }); });
 
   // Formulare: senden an FORM_ENDPOINT (action) wenn gesetzt, sonst lokal bestätigen
@@ -112,7 +115,7 @@
           // Kein Endpunkt konfiguriert: Anfrage als WhatsApp-Nachricht vorbereiten
           var f = new FormData(tf);
           var msg = ['Terminanfrage', 'Name: ' + f.get('name'), 'Kontakt: ' + f.get('kontakt'), 'Anliegen: ' + f.get('anliegen'), f.get('wunschzeit') ? 'Wunschzeit: ' + f.get('wunschzeit') : '', f.get('nachricht') ? 'Nachricht: ' + f.get('nachricht') : ''].filter(Boolean).join('\n');
-          var wa = document.querySelector('.sticky a[href^="https://wa.me"]');
+          var wa = document.querySelector('a[href^="https://wa.me"]');
           var num = wa ? wa.getAttribute('href').match(/wa\.me\/(\d+)/)[1] : '';
           window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
         }
@@ -168,14 +171,16 @@
   // ProvenExpert-Siegel: verzögert laden, damit LCP und Mobile unberührt bleiben
   if (window.MP_PE && !document.documentElement.hasAttribute('data-preview-noindex')) {
     var loadSeal = function () {
-      if (window.__peLoaded) return; window.__peLoaded = true;
+      if (window.__peLoaded) return;
       var mobile = window.innerWidth < 1000;
+      if (mobile && !window.MP_PE.mobile) return;
+      window.__peLoaded = true;
       window.loadProSeal = function () {
         if (!window.provenExpert) return;
         window.provenExpert.proSeal({
           widgetId: window.MP_PE.id, language: 'de-DE', usePageLanguage: false,
           bannerColor: window.MP_PE.color, textColor: '#FFFFFF', showReviews: true, hideDate: true, hideName: false,
-          hideOnMobile: false, bottom: mobile ? '86px' : '30px', stickyToSide: 'right', googleStars: true, zIndex: '95', displayReviewerLastName: false
+          hideOnMobile: !window.MP_PE.mobile, bottom: mobile ? '86px' : '30px', stickyToSide: 'right', googleStars: true, zIndex: '95', displayReviewerLastName: false
         });
       };
       var sc = document.createElement('script'); sc.src = 'https://s.provenexpert.net/seals/proseal-v2.js'; sc.async = true; sc.onload = window.loadProSeal;
@@ -198,5 +203,64 @@
       });
     }, { rootMargin: '200px 0px' });
     vids.forEach(function (v) { vio.observe(v); });
+  }
+
+  // Lange Bewertungen auf sechs Zeilen kürzen, mit „Weiterlesen“ (Masterbriefing 2.4). Text bleibt vollständig im HTML.
+  var clampReview = function (p) {
+    if (p.hasAttribute('data-clamp') || p.textContent.length < 120) return;
+    p.classList.add('is-clamped');
+    if (p.scrollHeight <= p.clientHeight + 2) { p.classList.remove('is-clamped'); return; }
+    p.setAttribute('data-clamp', '');
+    var id = 'rv' + Math.random().toString(36).slice(2, 8); p.id = id;
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'review__more';
+    b.setAttribute('aria-controls', id); b.setAttribute('aria-expanded', 'false'); b.textContent = 'Weiterlesen';
+    b.addEventListener('click', function () {
+      var open = p.classList.toggle('is-clamped') === false;
+      b.setAttribute('aria-expanded', String(open)); b.textContent = open ? 'Weniger anzeigen' : 'Weiterlesen';
+    });
+    p.insertAdjacentElement('afterend', b);
+  };
+  document.querySelectorAll('.review:not(.is-more) p').forEach(clampReview);
+
+  // Bewertungsseite: zuerst neun Karten, der Rest auf Wunsch. Alle Texte stehen im HTML.
+  var moreBtn = document.querySelector('[data-reviews-more]');
+  var paged = document.querySelector('.reviews--paged');
+  if (moreBtn && paged && paged.querySelector('.is-more')) {
+    moreBtn.parentNode.hidden = false;
+    moreBtn.addEventListener('click', function () {
+      paged.classList.add('is-open');
+      moreBtn.setAttribute('aria-expanded', 'true');
+      paged.querySelectorAll('.is-more p').forEach(clampReview);
+      var first = paged.querySelector('.is-more');
+      moreBtn.parentNode.hidden = true;
+      if (first) { first.setAttribute('tabindex', '-1'); first.focus({ preventScroll: true }); }
+      track('Bewertungen', { aktion: 'alle anzeigen' });
+    });
+  }
+
+  // Sticky-Leiste (Masterbriefing 8): erst zeigen, wenn die Hero-Buttons oberhalb des Bildschirms liegen,
+  // und ausblenden, solange der Kontaktabschluss mit denselben Wegen sichtbar ist.
+  // Positionsmessung statt reiner Schnittmengen-Ereignisse: robust auch bei Sprüngen (Statusleiste, Anker, Zurück).
+  var bar = document.querySelector('.sticky');
+  if (bar) {
+    // Seiten ohne Hero-Buttons: Schwelle ist der Kurz-gesagt-Kasten bzw. die H1.
+    var heroCta = document.querySelector('[data-hero-cta]') || document.querySelector('main .summary') || document.querySelector('main h1');
+    var petrol = document.querySelectorAll('.section--petrol');
+    var endZone = petrol.length ? petrol[petrol.length - 1] : null;
+    var barTick = false;
+    var applyBar = function () {
+      barTick = false;
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      var passedHero = !heroCta || heroCta.getBoundingClientRect().bottom < 0;
+      var inEnd = !!endZone && endZone.getBoundingClientRect().top < vh * 0.75;
+      var show = passedHero && !inEnd;
+      bar.classList.toggle('is-hidden', !show);
+      if (show) bar.removeAttribute('inert'); else bar.setAttribute('inert', '');
+    };
+    var queueBar = function () { if (!barTick) { barTick = true; requestAnimationFrame(applyBar); } };
+    window.addEventListener('scroll', queueBar, { passive: true });
+    window.addEventListener('resize', queueBar);
+    window.addEventListener('pageshow', queueBar);
+    applyBar();
   }
 })();
