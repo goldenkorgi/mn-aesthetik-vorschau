@@ -117,6 +117,29 @@
     return !first;
   };
 
+  // Vollständige Preisliste steht nicht im Seitenquelltext (Masterbriefing 17.09.2026, Kap. 12), sie wird nach dem Formular nachgeladen
+  var loadPricelist = function (scroll) {
+    var list = document.querySelector('[data-pricelist-content]');
+    if (!list) return;
+    var reveal = function () {
+      list.hidden = false; list.querySelectorAll('.reveal').forEach(show);
+      if (scroll) setTimeout(function () { list.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }, 80);
+    };
+    if (list.getAttribute('data-loaded')) { reveal(); return; }
+    fetch(list.getAttribute('data-pricelist-src'), { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (txt) {
+        var doc = new DOMParser().parseFromString(txt, 'text/html');
+        var inner = doc.body.firstElementChild;
+        if (inner) list.appendChild(document.importNode(inner, true));
+        list.setAttribute('data-loaded', '1'); reveal();
+      })
+      .catch(function () {
+        list.innerHTML = '<div class="container"><p>Die Preisliste konnte gerade nicht geladen werden. Schreiben Sie uns gern per WhatsApp oder rufen Sie an.</p></div>';
+        list.hidden = false;
+      });
+  };
+
   // Preislisten-Funnel: E-Mail -> Liste sofort anzeigen -> WhatsApp-Hinweis
   var pl = document.querySelector('form[data-pricelist]');
   if (pl) {
@@ -131,13 +154,12 @@
         pl.setAttribute('data-done', 'true');
         var okBox = document.querySelector('[data-pricelist-success]'); okBox.setAttribute('data-show', 'true');
         try { okBox.focus({ preventScroll: true }); } catch (err) {}
-        var list = document.querySelector('[data-pricelist-content]');
-        if (list) { list.hidden = false; list.querySelectorAll('.reveal').forEach(show); setTimeout(function () { list.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }, 80); }
+        loadPricelist(true);
         try { localStorage.setItem('mp_pricelist', '1'); } catch (err) {}
         track('Preisliste', { whatsapp: opt && opt.checked ? 'ja' : 'nein' });
       });
     });
-    try { if (localStorage.getItem('mp_pricelist') === '1') { var list0 = document.querySelector('[data-pricelist-content]'); if (list0) { list0.hidden = false; list0.querySelectorAll('.reveal').forEach(show); } } } catch (err) {}
+    try { if (localStorage.getItem('mp_pricelist') === '1') loadPricelist(false); } catch (err) {}
   }
 
   // Terminformular
